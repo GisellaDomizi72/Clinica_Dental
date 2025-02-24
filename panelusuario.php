@@ -2,7 +2,7 @@
 include ("seguridad.php");
 include("conexion.php"); // Realizo la conexión
 if (!isset($_SESSION['id_usuario'])) {
-    header("Location: login.php");
+    header("Location: iniciarsesion.php");
     exit();
 }
 $id_usuario = $_SESSION['id_usuario'];
@@ -47,7 +47,7 @@ $id_usuario = $_SESSION['id_usuario'];
     </nav>
     <div class="container text-center my-4">
         <h1 class="display-4">¡Bienvenido!</h1>
-        <p>Tus turnos se encuentran aquí</p>
+        <h2 class="mt-4 text-primary">Tus turnos se encuentran aquí</h2>
         <div class="container my-4">
         <?php
             // Consultar los registros de la tabla turnos
@@ -62,17 +62,26 @@ $id_usuario = $_SESSION['id_usuario'];
                 echo "<th scope='col'>Hora</th>";
                 echo "<th scope='col'>Servicio</th>";
                 echo "<th scope='col'>Dentista</th>";
+                echo "<th scope='col'>Acciones</th>";
                 echo "</tr>";
                 echo "</thead>";
                 echo "<tbody>";
                 while ($row = mysqli_fetch_assoc($resultado)) {
-                    // Formatear la hora para mostrar solo horas y minutos
+                    // Formatear la hora para mostrar solecho "<th scope='col'>Acciones</th>";o horas y minutos
                     $hora_formateada = substr($row['hora'], 0, 5); // Toma solo los primeros 5 caracteres (HH:mm)
                     echo "<tr>";
                     echo "<td>" . $row['fecha'] . "</td>";
                     echo "<td>" . $hora_formateada . "</td>"; // Mostrar hora formateada
                     echo "<td>" . $row['nombre_s'] . "</td>";
                     echo "<td>" . $row['nombre_d'] . " " . $row['apellido_d'] . "</td>";
+                    echo "<td>"
+                        . "<form action='eliminar_turno.php' method='POST' style='display:inline;'>"
+                        . "<input type='hidden' name='id_turno' value='{$row['id_turno']}'>"
+                        . "<button type='submit' class='btn btn-danger btn-sm' onclick='return confirm(\"¿Estás seguro de eliminar este turno?\");'>"
+                        . "<i class='bi bi-trash'></i> Eliminar"
+                        . "</button>"
+                        . "</form>"
+                        . "</td>";
                     echo "</tr>";
                 }
                 echo "</tbody>";
@@ -81,8 +90,6 @@ $id_usuario = $_SESSION['id_usuario'];
             } else {
                 echo "<p>No tienes turnos asignados.</p>";
             }
-
-            mysqli_close($conexion); // Cerrar la conexión
             ?>
         </div>
         <div>
@@ -92,6 +99,50 @@ $id_usuario = $_SESSION['id_usuario'];
             <div class="alert alert-primary" role="alert">
             Al momento de sacar turno recuerde que los días sábados, domingos y feriados la clinica no abre y se pierde el turno correspondiente a ese día.
             </div>
+        </div>
+        <div class="container my-4">
+            <!-- Turnos Cancelados de los Pacientes-->
+            <h2 class="mt-4 text-danger">Turnos Cancelados</h2>
+            <p>Aquí podrá ver cuando el Dentista cancele un turno por motivos de fuerza mayor.</p>
+            <?php
+            $query_cancelaciones = "SELECT c.id_cancelacion, c.fecha, c.hora, s.nombre_s, d.nombre_d, d.apellido_d 
+            FROM tpcancel c
+            INNER JOIN servicios s ON c.id_servicio = s.id_servicio
+            INNER JOIN dentistas d ON s.id_dentista = d.id_dentista
+            WHERE c.id_paciente = (SELECT id_paciente FROM pacientes WHERE id_usuario = '$id_usuario')
+            ORDER BY c.fecha ASC, c.hora ASC";
+            $resultado_cancelaciones = mysqli_query($conexion, $query_cancelaciones);
+
+            if (mysqli_num_rows($resultado_cancelaciones) > 0) {
+                echo "<div class='table-responsive'>";
+                echo "<table class='table table-striped table-bordered'>";
+                echo "<thead class='table-danger'><tr>";
+                echo "<th>Fecha</th><th>Hora</th><th>Servicio</th><th>Dentista</th><th scope='col'>Acciones</th></tr></thead>";
+                echo "<tbody>";
+
+                while ($row = mysqli_fetch_assoc($resultado_cancelaciones)) {
+                    $hora_formateada = substr($row['hora'], 0, 5);
+                    echo "<tr>";
+                    echo "<td>" . $row['fecha'] . "</td>";
+                    echo "<td>" . $hora_formateada . "</td>";
+                    echo "<td>" . $row['nombre_s'] . "</td>";
+                    echo "<td>" . $row['nombre_d'] . " " . $row['apellido_d'] . "</td>";
+                    echo "<td>"
+                        . "<form action='eliminar_tpcancelado.php' method='POST' style='display:inline;'>"
+                        . "<input type='hidden' name='id_cancelacion' value='{$row['id_cancelacion']}'>"
+                        . "<button type='submit' class='btn btn-danger btn-sm' onclick='return confirm(\"¿Estás seguro de eliminar este registro?\");'>"
+                        . "<i class='bi bi-trash'></i> Eliminar"
+                        . "</button>"
+                        . "</form>"
+                        . "</td>";
+                    echo "</tr>";
+                }
+                echo "</tbody></table></div>";
+            } else {
+                echo "<p>No tienes turnos cancelados.</p>";
+            }
+            mysqli_close($conexion); // Cerrar la conexión
+            ?>
         </div>
     </div>
 

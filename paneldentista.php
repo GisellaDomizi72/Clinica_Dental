@@ -1,7 +1,10 @@
 <?php
 include ("seguridad.php");
 include("conexion.php"); // Realizo la conexión
-session_start();
+if (!isset($_SESSION['id_usuario'])) {
+    header("Location: iniciarsesion.php");
+    exit();
+}
 $id_usuario = $_SESSION['id_usuario'];
 ?>
 <!DOCTYPE html>
@@ -47,15 +50,15 @@ $id_usuario = $_SESSION['id_usuario'];
     <div class="container text-center my-4">
         <h1 class="display-4">¡Bienvenido!</h1>
         <p>Verifica los pacientes y horarios de los turnos desde este panel.</p>
-        
+        <h2 class="mt-4 text-primary">Tus turnos se encuentran aquí</h2>
         <?php
         // Consultar los turnos asignados al dentista que inició sesión
         $query = "SELECT turnos.id_turno, turnos.fecha, turnos.hora, pacientes.nombre_p, pacientes.apellido_p, servicios.nombre_s 
-                FROM turnos 
-                INNER JOIN servicios ON turnos.id_servicio = servicios.id_servicio 
-                INNER JOIN pacientes ON turnos.id_paciente = pacientes.id_paciente 
-                WHERE servicios.id_dentista = (SELECT id_dentista FROM dentistas WHERE id_usuario = '$id_usuario')
-                ORDER BY turnos.fecha ASC, turnos.hora ASC";
+            FROM turnos 
+            INNER JOIN servicios ON turnos.id_servicio = servicios.id_servicio 
+            INNER JOIN pacientes ON turnos.id_paciente = pacientes.id_paciente 
+            WHERE servicios.id_dentista = (SELECT id_dentista FROM dentistas WHERE id_usuario = '$id_usuario')
+            ORDER BY turnos.fecha ASC, turnos.hora ASC";
 
         $resultado = mysqli_query($conexion, $query);
 
@@ -89,8 +92,53 @@ $id_usuario = $_SESSION['id_usuario'];
             echo "<p>No tienes turnos asignados.</p>";
         }
 
+        ?>
+        <!-- Turnos cancelados de los Dentistas -->
+        <div class="container my-4">
+        <h2 class="mt-4 text-danger">Turnos Cancelados</h2>
+        <p>Aquí podrá ver cuando el Paciente cancele un turno por motivos de fuerza mayor.</p>
+
+        <?php
+        $query_cancelaciones = "SELECT c.id_cancelacion, c.fecha, c.hora, p.nombre_p, p.apellido_p, s.nombre_s 
+            FROM tdcancel c
+            INNER JOIN servicios s ON c.id_servicio = s.id_servicio
+            INNER JOIN pacientes p ON c.id_paciente = p.id_paciente
+            WHERE s.id_dentista = (SELECT id_dentista FROM dentistas WHERE id_usuario = '$id_usuario')
+            ORDER BY c.fecha ASC, c.hora ASC";
+        $resultado_cancelaciones = mysqli_query($conexion, $query_cancelaciones);
+
+        if (mysqli_num_rows($resultado_cancelaciones) > 0) {
+            echo "<div class='table-responsive'>";
+            echo "<table class='table table-striped table-bordered'>";
+            echo "<thead class='table-danger'><tr>";
+            echo "<th>Fecha</th><th>Hora</th><th>Paciente</th><th>Servicio</th><th scope='col'>Acciones</th></tr></thead>";
+            echo "<tbody>";
+            
+            while ($row = mysqli_fetch_assoc($resultado_cancelaciones)) {
+                $hora_formateada = substr($row['hora'], 0, 5);
+                echo "<tr>";
+                echo "<td>" . $row['fecha'] . "</td>";
+                echo "<td>" . $hora_formateada . "</td>";
+                echo "<td>" . $row['nombre_p'] . " " . $row['apellido_p'] . "</td>";
+                echo "<td>" . $row['nombre_s'] . "</td>";
+                echo "<td>"
+                    . "<form action='eliminar_tdcancelado.php' method='POST' style='display:inline;'>"
+                    . "<input type='hidden' name='id_cancelacion' value='{$row['id_cancelacion']}'>"
+                    . "<button type='submit' class='btn btn-danger btn-sm' onclick='return confirm(\"¿Estás seguro de eliminar este registro?\");'>"
+                    . "<i class='bi bi-trash'></i> Eliminar"
+                    . "</button>"
+                    . "</form>"
+                    . "</td>";
+                echo "</tr>";
+            }
+            echo "</tbody></table></div>";
+        } else {
+            echo "<p>No hay turnos cancelados.</p>";
+        }
+
         mysqli_close($conexion); // Cerrar la conexión
         ?>
+        </div>
 
     </div>
     <footer style="background-color: #c1e5fd;" class="container-fluid; text-center mt-4"><br><br>
